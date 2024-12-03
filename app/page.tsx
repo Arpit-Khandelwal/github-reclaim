@@ -1,101 +1,144 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
+import { ReclaimProofRequest } from '@reclaimprotocol/js-sdk';
+import QRCode from 'react-qr-code';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [address, setAddress] = useState('');
+  const [contributions, setContributions] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [requestUrl, setRequestUrl] = useState('');
+  const [proofs, setProofs] = useState('');
+  const APP_ID = "YOUR_APP_ID";
+  const APP_SECRET = "YOUR_APP_SECRET";
+  const PROVIDER_ID = "GITHUB_PROVIDER_ID";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  async function connectWallet() {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        if (window.ethereum) {
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = provider.getSigner();
+          const address = (await (await signer).getAddress());
+          setAddress(address);
+        } else {
+          throw new Error('Ethereum is not available');
+        }
+      } catch (error) {
+        console.error('Error connecting wallet:', error);
+      }
+    }
+  }
+
+  async function verifyGithubContributions() {
+    setLoading(true);
+    try {
+      const APP_ID = "0x50f48049c72bAFc0f2F3c6C6F48B6d0271C38F83";
+      const APP_SECRET = "0xfdc1ae446cb63567b570aab15fc035378c53efbd59b969d5bb6b53860e85d0eb";
+      const PROVIDER_ID = "8573efb4-4529-47d3-80da-eaa7384dac19";
+      const reclaimProofRequest = ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID)
+
+      // const request = await reclaim.request({
+      //   title: 'GitHub Contributions Verification',
+      //   callbackUrl: window.location.origin,
+      //   appId: APP_ID,
+      //   appSecret: APP_SECRET,
+      //   providers: [{
+      //     provider: PROVIDER_ID,
+      //     params: {}
+      //   }]
+      // });
+
+      // const { requestId } = request;
+      // const proofUrl = request.generateUrl();
+
+      // window.location.href = proofUrl||"";
+
+      const requestUrl = (await (await reclaimProofRequest).getRequestUrl());
+      console.log('Request URL:', requestUrl);
+      setRequestUrl(requestUrl);
+
+
+      let finalProof = "";
+      // Start listening for proof submissions
+      (await reclaimProofRequest).startSession({
+        // Called when the user successfully completes the verification
+        onSuccess: (proofs) => {
+          if (proofs) {
+            if (typeof proofs === 'string') {
+              // When using a custom callback url, the proof is returned to the callback url and we get a message instead of a proof
+              console.log('SDK Message:', proofs);
+              setProofs(proofs);
+              finalProof = proofs
+              // setProofs([proofs]);
+
+            } else if (typeof proofs !== 'string') {
+              // When using the default callback url, we get a proof object in the response
+              console.log('Verification success', proofs?.claimData.context);
+              setProofs(JSON.stringify(proofs));
+              finalProof = JSON.stringify(proofs)
+            }
+            // send request to server with body {proofs}
+          }
+        },
+        // Called if there's an error during verification
+        onError: (error: any) => {
+          console.error('Verification failed', error);
+        },
+      });
+      await fetch('/api/callback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ proofs: finalProof }),
+      });
+    } catch (error) {
+      console.error('Error verifying contributions:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
+        <h1 className="text-4xl font-bold mb-8">GitHub Contributor Rewards</h1>
+
+        {!address ? (
+          <button
+            onClick={connectWallet}
+            className="bg-blue-500 text-white px-4 py-2 rounded"
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            Connect Wallet
+          </button>
+        ) : (
+          <div>
+            <p>Connected: {address}</p>
+            <button
+              onClick={verifyGithubContributions}
+              className="bg-green-500 text-white px-4 py-2 rounded mt-4"
+              disabled={loading}
+            >
+
+            {loading ? 'Verifying...' : 'Verify GitHub Contributions'}
+            </button>
+            {requestUrl && (
+              <div style={{ margin: '20px 0' }}>
+                <QRCode value={requestUrl} />
+              </div>
+            )}
+            {proofs && (
+              <div>
+                <h2>Verification Successful!</h2>
+                <pre>{JSON.stringify(proofs, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

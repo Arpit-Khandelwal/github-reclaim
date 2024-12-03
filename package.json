@@ -9,9 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@reclaimprotocol/js-sdk": "^2.1.1",
+    "@reclaimprotocol/reclaim-sdk": "^6.0.0",
+    "ethers": "^6.13.4",
+    "next": "14.2.18",
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.2.18"
+    "react-qr-code": "^2.0.15"
   },
   "devDependencies": {
     "typescript": "^5",
